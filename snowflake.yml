@@ -1,0 +1,13 @@
+definition_version: 2
+entities:
+  overlay_dashboard:
+    type: streamlit
+    identifier:
+      name: OVERLAY_DASHBOARD
+      database: AFE
+      schema: DBT_DEV
+    query_warehouse: SNOWADHOC
+    main_file: app.py
+    artifacts:
+      - app.py
+      - pyproject.toml
