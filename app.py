@@ -374,20 +374,22 @@ if "_nav_page" in st.session_state:
 
 with st.sidebar:
     st.header("Navigation")
-    module = st.selectbox("Module", ["Home", "Consumption", "Use Case", "Flags"], key="module_selector")
+    module = st.selectbox("Module", ["Home", "Consumption", "Use Case", "Flags", "Guide", "About"], key="module_selector")
 
     MODULE_PAGES = {
         "Home": ["Dashboard Overview"],
         "Consumption": ["Lights On / Lights Off", "Consumption Intelligence"],
         "Use Case": ["Use Case Forecasting", "Use Case Hygiene"],
         "Flags": ["Field Flags"],
+        "Guide": ["Operational Manual"],
+        "About": ["About This App"],
     }
     page = st.radio(
         "Page",
         MODULE_PAGES[module],
         key=f"page_selector_{module}",
     )
-    if module != "Home":
+    if module not in ("Home", "Guide", "About"):
         st.divider()
         st.header("Filters")
 
@@ -640,7 +642,7 @@ if module == "Home":
     st.divider()
     st.subheader(":material/trending_up: Consumption Health")
 
-    h1, h2, h3, h4, h5, h6 = st.columns(6)
+    h1, h2, h3 = st.columns(3)
     with h1:
         st.metric("QTD Consumption", fmt_currency(_qtd))
         if st.button("→ Consumption Intelligence", key="h_qtd", use_container_width=True):
@@ -659,6 +661,8 @@ if module == "Home":
             st.session_state["_nav_module"] = "Consumption"
             st.session_state["_nav_page"] = "Consumption Intelligence"
             st.rerun()
+
+    h4, h5, h6 = st.columns(3)
     with h4:
         st.metric("Lights Off Accounts", _lights_off)
         if st.button("→ Lights On / Lights Off", key="h_lo", use_container_width=True):
@@ -682,7 +686,7 @@ if module == "Home":
     st.divider()
     st.subheader(":material/query_stats: Pipeline Health")
 
-    p1, p2, p3, p4, p5, p6 = st.columns(6)
+    p1, p2, p3 = st.columns(3)
     with p1:
         _gl_cov_disp = f"{_gl_cov:.1f}x" if _gl_cov != float("inf") else "∞"
         _gl_color = "normal" if _gl_cov >= COVERAGE_HEALTHY else ("off" if _gl_cov < COVERAGE_WARNING else "normal")
@@ -704,6 +708,8 @@ if module == "Home":
             st.session_state["_nav_module"] = "Use Case"
             st.session_state["_nav_page"] = "Use Case Forecasting"
             st.rerun()
+
+    p4, p5, p6 = st.columns(3)
     with p4:
         st.metric("At-Risk Go-Lives", _at_risk_gl)
         if st.button("→ Use Case Forecasting", key="h_argl", use_container_width=True):
@@ -2726,4 +2732,397 @@ elif module == "Flags":
                          column_config=_c_cfg, hide_index=True, use_container_width=True)
         else:
             st.success("No declining accounts with open pursuit use cases.")
+
+
+# ── Guide module ──────────────────────────────────────────────────────────────
+
+elif module == "Guide":
+    st.markdown("# :material/menu_book: Operational Manual")
+    st.caption("How to use the Overlay Dashboard — reference for field teams and managers")
+
+    (
+        tab_overview,
+        tab_home,
+        tab_consumption,
+        tab_usecase,
+        tab_flags,
+        tab_ref,
+    ) = st.tabs([
+        "Overview",
+        "Home — Command Center",
+        "Consumption",
+        "Use Case",
+        "Field Flags",
+        "Thresholds & Data",
+    ])
+
+    # ── Tab 1: Overview ───────────────────────────────────────────────────────
+    with tab_overview:
+        st.markdown("""
+## What Is This App?
+
+The **Overlay Dashboard** is the single source of truth for Overlay Specialists,
+Managers, and Area Field Executives (AFEs) to monitor the health of their book of
+business, track use case pipeline, and ensure field data quality in Salesforce.
+
+### Who Uses It
+| Role | Primary Use |
+|------|-------------|
+| Specialist | Daily hygiene — update comments, review flag counts |
+| Manager | Weekly forecast prep — coverage ratios, at-risk go-lives |
+| AFE / VP | QBR readiness — QoQ trends, pipeline sufficiency, urgent decliners |
+
+### How It's Organised
+| Module | Purpose |
+|--------|---------|
+| **Home** | 12-KPI command center — snapshot of the entire business |
+| **Consumption** | Revenue trends, Lights On / Lights Off, account-level intelligence |
+| **Use Case** | Pipeline forecasting, tech win tracking, hygiene scoring |
+| **Flags** | Data-quality action list — goal is zero on every counter |
+| **Guide** | This manual |
+
+### Data Refresh
+All data is cached for **30 minutes**. Each page shows a cache timestamp in the
+sidebar caption. Force a refresh by reloading the browser tab.
+""")
+        st.info(
+            "**Warehouse:** The app runs on `SNOWADHOC`. "
+            "If queries time out, check that the warehouse is not suspended."
+        )
+
+    # ── Tab 2: Home — Command Center ─────────────────────────────────────────
+    with tab_home:
+        st.markdown("""
+## Business Health Command Center
+
+The Home page is unfiltered — it covers the **full book of business** so
+leadership can see total health at a glance.
+
+### Row 1 — Consumption Health
+
+| KPI | Definition | Act When |
+|-----|-----------|---------|
+| **QTD Consumption** | Sum of `current_fiscal_quarter_revenue` across all accounts | Below plan → escalate to Consumption Intelligence |
+| **Predicted FQ Finish** | Model prediction for end-of-quarter revenue | < QTD → forecast risk; engage at-risk accounts |
+| **QoQ vs Prior FQ** | % change vs previous fiscal quarter | Negative → review Lights Off accounts |
+| **Lights Off Accounts** | Accounts with zero or near-zero consumption in the current period | > 0 → open Lights On / Lights Off immediately |
+| **Urgent Decliners** | Accounts with 30-day revenue decline **and** no meeting in 30+ days | Any → schedule outreach this week |
+| **Revenue at Risk (30d)** | Sum of negative 30-day revenue deltas across all accounts | Rising → assign specialist coverage |
+
+### Row 2 — Pipeline Health
+
+| KPI | Definition | Act When |
+|-----|-----------|---------|
+| **Go-Live Coverage** | Open pipeline EACV ÷ QTD Won target | < 1.5x (yellow) or < 2.0x (red) → build pipeline |
+| **Win Coverage** | Open + won pipeline ÷ target | < 1.5x → urgently qualify new use cases |
+| **QTD Won** | Sum of EACV for tech-won use cases this quarter | Tracking behind plan → focus NTB accounts |
+| **At-Risk Go-Lives** | Use cases with `health_status = At Risk` and current-FQ go-live | Any → review with AE and Specialist |
+| **Specialists Overdue** | Specialists with `update_needed_status = Needed Now` | Any → direct manager action today |
+| **Missing Comments ($)** | EACV of active use cases with stale or absent SFDC comments | High → Group B Flags → No Specialist / Stale Comments |
+
+### Navigation Buttons
+Each KPI card has a **→ button** that jumps directly to the relevant detail page.
+The "View All Field Flags" button at the bottom opens the Flags module.
+""")
+
+    # ── Tab 3: Consumption ────────────────────────────────────────────────────
+    with tab_consumption:
+        st.markdown("""
+## Consumption Module
+
+### Page 1 — Lights On / Lights Off
+
+**Purpose:** Identify the biggest movers in consumption — accounts accelerating
+(Lights On) and accounts declining (Lights Off).
+
+**Filters:** Region · Theater · Product Category · Feature · Functional Area ·
+Industry · Account / Owner Search
+
+**Period selector:** Compare the current window (7, 14, 30, or 90 days) against
+the prior equivalent window.
+
+| Section | What to Look For |
+|---------|-----------------|
+| **Lights Off table** | Largest negative revenue deltas — sort by delta to find the worst accounts |
+| **Lights On table** | Largest positive deltas — candidates for expansion motions |
+| **Delta chart** | Trend of net daily delta — a worsening slope needs immediate engagement |
+
+**Action:** For any Lights Off account, click the account name to pull up its
+risk context, then assign or confirm Specialist coverage.
+
+---
+
+### Page 2 — Consumption Intelligence
+
+**Purpose:** Deep-dive consumption health, trend analysis, and predictive signals
+across the filtered book of business.
+
+| Section | What to Look For |
+|---------|-----------------|
+| **QoQ trend chart** | Quarter-over-quarter revenue progression — declining slope needs executive attention |
+| **Prediction vs Actual** | Gap between `revenue_prediction_current_fiscal_quarter` and QTD actuals |
+| **Account heat map** | Concentration of risk by region / theater |
+| **Risk movements** | Accounts that moved risk tiers — new `HIGH` or `CRITICAL` entries need same-week action |
+
+**Action:** Filter to your theater before reviewing. Export the heat map view
+for your QBR or weekly manager call.
+""")
+
+    # ── Tab 4: Use Case ───────────────────────────────────────────────────────
+    with tab_usecase:
+        st.markdown("""
+## Use Case Module
+
+### Page 1 — Use Case Forecasting
+
+**Purpose:** Track pipeline coverage and go-live commitments for the current and
+future fiscal quarters.
+
+**Filters:** Fiscal Quarter · Theater · Region · Account Owner · Specialist ·
+Product Category · Specialist Manager
+
+| Metric | Definition |
+|--------|-----------|
+| **Go-Live Coverage** | Open pipeline ÷ won target. Healthy ≥ 2.0x, warning < 1.5x |
+| **Win Coverage** | (Open + won) ÷ target |
+| **Tech Won** | Use cases with `is_tech_won = True` — counts toward closed revenue |
+| **Pipeline table** | Full list of open use cases with stage, EACV, go-live date, health status |
+
+**How to Use:**
+1. Set the **Fiscal Quarter** filter to the current FQ.
+2. Check Go-Live and Win coverage ratios. Below 2.0x → actively qualify new use cases.
+3. Sort the pipeline table by **Go-Live Date** ascending — anything without a
+   Specialist assigned in the next 30 days is an immediate risk.
+4. Use the **Specialist Name** filter to review individual specialist pipelines
+   on 1:1 calls.
+
+---
+
+### Page 2 — Use Case Hygiene
+
+**Purpose:** Surface use cases that are missing critical data fields or have
+stale Specialist engagement.
+
+| Flag | Meaning | Action |
+|------|---------|--------|
+| **No Specialist** | `has_specialist_coverage = False` | Assign coverage in SFDC today |
+| **Stale Comment** | `comment_stale_flag = True` (> 30 days) | Specialist updates comment this week |
+| **At-Risk** | `health_status = At Risk` | AE + Specialist joint call; update MEDIC |
+| **Missing Decision Date** | `decision_date` is null | AE fills in SFDC; required for forecast |
+| **Missing Go-Live Date** | `go_live_date` is null | Required for FQ planning; block this use case from pipeline reporting |
+
+**Goal:** Every in-flight use case should have a Specialist, a Decision Date,
+a Go-Live Date, and a comment updated within 30 days.
+""")
+
+    # ── Tab 5: Field Flags ────────────────────────────────────────────────────
+    with tab_flags:
+        st.markdown("""
+## Field Flags Dashboard
+
+**Goal: every counter = 0.** Each flag group surfaces a specific category of
+data-quality debt. Managers review this page at the start of every forecast week.
+
+---
+
+### Group A — Specialist Data Quality
+
+Filters: Theater · Manager · Specialist Group (sidebar)
+
+| Flag | Definition | Action |
+|------|-----------|--------|
+| **Overdue (Needed Now)** | `update_needed_status = Needed Now` | Manager escalation — update SFDC comments **today** |
+| **Due Soon (Needed Soon)** | `update_needed_status = Needed Soon` | Update before the next forecast call |
+| **Zero Activity 14d** | No SFDC activities logged in 14 days, has active UCs | Specialist re-engages or manager re-assigns |
+| **Zero Comments 14d** | No SFDC comments in 14 days, has active UCs | Add a comment for every active use case this week |
+| **No Active UCs** | Specialist has no use cases assigned | Manager reviews capacity and assigns pipeline |
+
+**Cadence:** Review Group A every Monday morning. Target = 0 Overdue before
+each Thursday forecast call.
+
+---
+
+### Group B — Use Case Record Quality
+
+| Flag | Definition | Action |
+|------|-----------|--------|
+| **No Specialist** | `has_specialist_coverage = False` | Assign in SFDC — no UC should be uncovered |
+| **Missing Decision Date** | `decision_date` is null | AE enters date; required for forecast accuracy |
+| **Missing Go-Live Date** | `go_live_date` is null | AE enters date; blocks FQ planning |
+| **No Tech Win — High EACV** | `is_tech_won = False` and EACV ≥ 75th percentile | High-value deal not yet technically qualified — prioritise |
+| **Stale Comments** | `comment_stale_flag = True` | Specialist adds comment this week |
+| **At-Risk Go-Lives** | `health_status = At Risk`, current FQ go-live | Joint AE + Specialist action plan this week |
+| **Low Go-Live Probability** | `go_live_probability < 50%` | Review blocking issues; escalate or slip the date |
+
+---
+
+### Group C — Account Engagement Gaps
+
+| Flag | Definition | Action |
+|------|-----------|--------|
+| **Urgent Decliners** | 30-day revenue decline **and** last meeting > 30 days ago | Schedule outreach this week — do not let these age |
+| **High-Risk UCs** | Accounts with `high_risk_use_cases > 0` | Consumption + Use Case joint review |
+| **Declining + Open Pursuit** | Declining revenue and active pursuit use case | Validate whether the pipeline is real; flag for manager |
+
+---
+""")
+        st.info(
+            "All expanders in the Flags page include **direct Salesforce links** "
+            "— click 'Open' in any table row to jump straight to the record."
+        )
+        st.warning(
+            "**Reset button:** The Reset button in the top-right of the Flags page "
+            "clears all session state and reloads the app. Use it if filters appear stuck."
+        )
+
+    # ── Tab 6: Thresholds & Data ──────────────────────────────────────────────
+    with tab_ref:
+        st.markdown("""
+## Thresholds & Constants
+
+These values drive all KPI colours, flag logic, and action directives across
+every module. Changes require a code update and re-deploy.
+
+| Constant | Value | Used In |
+|----------|-------|---------|
+| `COVERAGE_WARNING` | **1.5x** | Go-Live and Win Coverage KPIs — turns yellow below this |
+| `COVERAGE_HEALTHY` | **2.0x** | Coverage KPIs — green at or above this |
+| `DAYS_NO_CONTACT` | **30 days** | Urgent Decliner flag — meeting gap threshold |
+| `DAYS_STALE_COMMENT` | **30 days** | Stale comment flag on use cases |
+| `EACV_PCT_HIGH` | **75th percentile** | "High EACV" threshold for No Tech Win flag |
+
+---
+
+## Data Sources
+
+| Table | Module | Contents |
+|-------|--------|---------|
+| `AFE.DBT_DEV_OVERLAY.MART_OVERLAY_BOB` | Consumption, Home | Account-level trailing revenue, deltas, predictions, growth rates |
+| `AFE.DBT_DEV_OVERLAY.MART_OVERLAY_ACCOUNT_BASE_METRICS` | Home, Flags | Meeting dates, active/risk/pursuit use case counts |
+| `AFE.DBT_DEV_OVERLAY.MART_OVERLAY_ACCOUNT_INDICATORS` | Flags | Consumption risk tier, account risk, assessment tier |
+| `AFE.DBT_DEV_OVERLAY.MART_OVERLAY_FORECAST_PIPELINE` | Use Case, Flags | Open use case pipeline — stage, EACV, go-live date, health, tech win |
+| `AFE.DBT_DEV_OVERLAY.MART_OVERLAY_RISK_MOVEMENTS` | Consumption | Accounts that changed risk tier — with mitigation notes |
+| `AFE.DBT_DEV_OVERLAY.MART_OVERLAY_DAILY_CONSUMPTION` | Consumption | Daily account consumption for trend charts |
+| `AFE.DBT_DEV_OVERLAY.MART_OVERLAY_PRODUCT_ACCOUNTS` | Consumption | Account → product category mapping |
+| `AFE.DBT_DEV_MARTS.SPECIALIST_ENGAGEMENT_STATUS` | Flags | Specialist activity, comment counts, update status |
+| `AFE.DBT_DEV_OVERLAY.MART_OVERLAY_SPECIALIST_PIPELINE` | Use Case | Specialist ↔ use case assignments |
+| `AFE.DBT_DEV_OVERLAY.MART_OVERLAY_ACTIVE_USE_CASES` | Use Case | Full active use case list |
+
+---
+
+## Cache Policy
+
+All tables are cached for **30 minutes** via `@st.cache_data(ttl=1800)`.
+To force an immediate refresh, reload the browser tab or press **R** in Streamlit.
+
+## Deployment
+
+```
+snow streamlit deploy --replace --connection afe_deploy --role AFE_ADMIN_RL
+```
+
+App location: `AFE.DBT_DEV.OVERLAY_DASHBOARD`
+""")
+
+
+# ── About module ──────────────────────────────────────────────────────────────
+
+elif module == "About":
+    st.markdown("# :material/info: About This App")
+    st.divider()
+
+    st.markdown("""
+## Overlay Dashboard
+
+Welcome to the Overlay Dashboard. Use the **Module** selector in the sidebar to
+navigate between modules, and the **Page** selector to switch between pages
+within each module.
+""")
+
+    st.divider()
+    st.markdown("## :material/bolt: Consumption")
+    st.markdown(
+        "Track and analyze account-level consumption trends, identify movers, "
+        "and drill into root causes."
+    )
+
+    ab1, ab2 = st.columns(2)
+    with ab1:
+        st.markdown("### Lights On / Lights Off")
+        st.markdown("""
+Tracks account-level consumption changes across comparison periods. Surfaces the
+top movers (up and down), provides root cause and engagement details for each
+account, and lists open use cases on filtered accounts.
+""")
+        if st.button("Open Lights On / Lights Off", key="ab_lo", use_container_width=True):
+            st.session_state["_nav_module"] = "Consumption"
+            st.session_state["_nav_page"] = "Lights On / Lights Off"
+            st.rerun()
+    with ab2:
+        st.markdown("### Consumption Intelligence")
+        st.markdown("""
+Executive summary with headline KPIs, consumption trend charts with forecasting,
+account-level consumption details by product category, monthly product breakdown,
+and percentage-of-total analysis across the filtered account set.
+""")
+        if st.button("Open Consumption Intelligence", key="ab_ci", use_container_width=True):
+            st.session_state["_nav_module"] = "Consumption"
+            st.session_state["_nav_page"] = "Consumption Intelligence"
+            st.rerun()
+
+    st.divider()
+    st.markdown("## :material/task_alt: Use Case")
+    st.markdown(
+        "Monitor the use case pipeline, track wins and go-lives, and assess "
+        "specialist engagement health."
+    )
+
+    ab3, ab4 = st.columns(2)
+    with ab3:
+        st.markdown("### Use Case Forecasting")
+        st.markdown("""
+Pipeline overview with Go-Live and Win KPIs (Total Pipeline, Weighted Pipeline,
+QTD Won/Deployed, Pipeline Coverage). Includes bar charts showing pipeline by
+stage, a detailed wins table with decision dates and specialist comments, and a
+go-lives table with health status and go-live probability tracking.
+""")
+        if st.button("Open Use Case Forecasting", key="ab_ucf", use_container_width=True):
+            st.session_state["_nav_module"] = "Use Case"
+            st.session_state["_nav_page"] = "Use Case Forecasting"
+            st.rerun()
+    with ab4:
+        st.markdown("### Use Case Hygiene")
+        st.markdown("""
+Specialist engagement dashboard showing update staleness, activity metrics
+(comments and activities over 7-day and 14-day windows), and drill-down into
+active use cases per specialist with EACV, stage, and Salesforce links.
+""")
+        if st.button("Open Use Case Hygiene", key="ab_uch", use_container_width=True):
+            st.session_state["_nav_module"] = "Use Case"
+            st.session_state["_nav_page"] = "Use Case Hygiene"
+            st.rerun()
+
+    st.divider()
+    ab5, ab6 = st.columns(2)
+    with ab5:
+        st.markdown("## :material/flag: Field Flags")
+        st.markdown("""
+Data-quality action list for the field. Three groups cover Specialist Data
+Quality, Use Case Record Quality, and Account Engagement Gaps. Each group
+surfaces a count of records needing attention with expandable tables and direct
+Salesforce links. **Goal: all counts = 0.**
+""")
+        if st.button("Open Field Flags", key="ab_flags", use_container_width=True):
+            st.session_state["_nav_module"] = "Flags"
+            st.rerun()
+    with ab6:
+        st.markdown("## :material/menu_book: Operational Guide")
+        st.markdown("""
+Detailed reference covering how to interpret every KPI, when to act, threshold
+definitions, data source inventory, and deployment instructions.
+""")
+        if st.button("Open Operational Guide", key="ab_guide", use_container_width=True):
+            st.session_state["_nav_module"] = "Guide"
+            st.rerun()
+
 
